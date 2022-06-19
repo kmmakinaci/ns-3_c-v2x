@@ -886,6 +886,104 @@ namespace ns3 {
     return txInfo;
   }
 
+SidelinkCommResourcePoolV2x::SidelinkTransmissionInfo
+SidelinkCommResourcePoolV2x::GetNextPosIndex(uint16_t m_posindex,SidelinkCommResourcePoolV2x::SubframeInfo subframe,uint16_t pps){
+	subframe.frameNo-=1;
+	subframe.subframeNo-=1;
+	SidelinkCommResourcePoolV2x::SidelinkTransmissionInfo res;
+	bool adjacency = LteRrcSap::adjacencyAsBool(m_adjacencyPscchPssch);
+	uint16_t SF = 1000/pps;
+	uint16_t sizeSubch = LteRrcSap::sizeSubchannelAsInt(m_sizeSubchannel);
+	uint16_t numSubch = LteRrcSap::numSubchannelAsInt(m_numSubchannel);
+	uint16_t startRbSubch = LteRrcSap::startRbSubchannelAsInt(m_startRbSubchannel);
+	uint16_t sel_sf = m_posindex%SF; //sf (P I) = P I mod SF
+
+	uint16_t r_pi = (m_posindex/SF)%numSubch;
+	uint16_t sc = (2*r_pi*(1/*Np 1*/))%numSubch;//FIXED ONLY 2 chosen for posindexes 100-200 and 200-300 +(2*r_pi/*(Np 1)*//numSubch); //rpi = pf/sf%sc/np
+	res.subframe.frameNo=sel_sf/10;
+	res.subframe.subframeNo=sel_sf%10;
+	if(adjacency){
+		res.rbLen=sizeSubch-2;
+	}
+	else{
+		res.rbLen=sizeSubch;
+	}
+	if(adjacency){
+		res.rbStart=startRbSubch+sc*sizeSubch+2;
+	}
+	else{
+		res.rbStart=startRbSubch+sc*sizeSubch;
+	}
+	res.subframe=res.subframe+subframe;
+	res.subframe.frameNo+=1;
+	res.subframe.subframeNo+=1;
+	if(res.subframe.subframeNo>10){
+		res.subframe.frameNo +=  res.subframe.subframeNo/10;
+		res.subframe.subframeNo = res.subframe.subframeNo%10;
+	}
+	if (res.subframe.frameNo > 1024)
+	{
+		res.subframe.frameNo = res.subframe.frameNo%1024;
+	}
+	return res;
+}
+
+
+SidelinkCommResourcePoolV2x::SidelinkTransmissionInfo
+SidelinkCommResourcePoolV2x::Randomize(uint16_t m_posindex,SidelinkCommResourcePoolV2x::SubframeInfo subframe,uint16_t pps){
+	subframe.frameNo-=1;
+	subframe.subframeNo-=1;
+	SidelinkCommResourcePoolV2x::SidelinkTransmissionInfo res;
+	bool adjacency = LteRrcSap::adjacencyAsBool(m_adjacencyPscchPssch);
+	uint16_t SF = 1000/pps;
+	uint16_t sizeSubch = LteRrcSap::sizeSubchannelAsInt(m_sizeSubchannel);
+	uint16_t numSubch = LteRrcSap::numSubchannelAsInt(m_numSubchannel);
+	uint16_t startRbSubch = LteRrcSap::startRbSubchannelAsInt(m_startRbSubchannel);
+	uint16_t sel_sf = m_posindex%SF; //sf (P I) = P I mod SF
+	uint16_t N = SF*numSubch;
+	int PR, M = 50/pps;
+	/*
+	 * PR={PI+N/2−SF/2ifSCmod2=0PI+N/2ifSCmod2=1
+	 *
+	 */
+	if(numSubch%2==1){
+		PR = m_posindex + N/2;
+	}
+	else{
+		PR = m_posindex + N/2 - SF/2;
+	}
+	int randposindex  = PR + ((rand()%(2*M)) - M)%N ; //l [(PR-M)modN,(PR+M)modN].In this study,Mhas been set equal to 5, 2 and 1 for vehiclestransmitting 10 pps, 20 pps and 50 pps, respectively
+	uint16_t r_pi = (randposindex/SF)%(numSubch/*/(Np 1)*/ );
+	uint16_t sc = (2*r_pi*(1/*Np 1*/))%numSubch;//FIXED ONLY 2 chosen for posindexes 100-200 and 200-300 +(2*r_pi/*(Np 1)*//numSubch); //rpi = pf/sf%sc/np
+	res.subframe.frameNo=sel_sf/10;
+	res.subframe.subframeNo=sel_sf%10;
+	if(adjacency){
+		res.rbLen=sizeSubch-2;
+	}
+	else{
+		res.rbLen=sizeSubch;
+	}
+	if(adjacency){
+		res.rbStart=startRbSubch+sc*sizeSubch+2;
+	}
+	else{
+		res.rbStart=startRbSubch+sc*sizeSubch;
+	}
+	res.subframe=res.subframe+subframe;
+	res.subframe.frameNo+=1;
+	res.subframe.subframeNo+=1;
+	if(res.subframe.subframeNo>10){
+		res.subframe.frameNo +=  res.subframe.subframeNo/10;
+		res.subframe.subframeNo = res.subframe.subframeNo%10;
+	}
+	if (res.subframe.frameNo > 1024)
+	{
+		res.subframe.frameNo = res.subframe.frameNo%1024;
+	}
+	return res;
+}
+
+
   std::list<SidelinkCommResourcePoolV2x::SidelinkTransmissionInfo>
   SidelinkCommResourcePoolV2x::GetPscchTransmissions (SidelinkCommResourcePoolV2x::SubframeInfo subframe, uint8_t riv, uint16_t pRsvp, uint8_t sfGap, uint8_t reTxIdx, uint8_t pscchResource, uint8_t reselCtr)
   { 

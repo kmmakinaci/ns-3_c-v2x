@@ -46,9 +46,14 @@
 #include "ns3/enum.h"
 #include <ns3/pointer.h>
 
+#include "ns3/network-module.h"
+
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("LteSpectrumPhy");
+
+std::string sim_uespecphy = "log_uespecphy_v2x.csv";
+Ptr<OutputStreamWrapper> log_uespecphy;
 
 
 /// duration of SRS portion of UL subframe  
@@ -226,11 +231,14 @@ LteSpectrumPhy::LteSpectrumPhy ()
   m_interferenceData = CreateObject<LteInterference> ();
   m_interferenceCtrl = CreateObject<LteInterference> ();
   m_interferenceSl = CreateObject<LteSlInterference> ();
-
+  m_disabled = false;
   for (uint8_t i = 0; i < 7; i++)
     {
       m_txModeGain.push_back (1.0);
     }
+
+  AsciiTraceHelper ascii;
+  log_uespecphy = ascii.CreateFileStream(sim_uespecphy);
 }
 
 
@@ -397,7 +405,13 @@ LteSpectrumPhy::GetTypeId (void)
   return tid;
 }
 
+void LteSpectrumPhy::SetDisabled(bool disabled){
+	m_disabled=disabled;
+}
 
+bool LteSpectrumPhy::GetDisabled(){
+	return m_disabled;
+}
 
 Ptr<NetDevice>
 LteSpectrumPhy::GetDevice () const
@@ -617,12 +631,14 @@ LteSpectrumPhy::StartTxDataFrame (Ptr<PacketBurst> pb, std::list<Ptr<LteControlM
     case RX_DL_CTRL:
     case RX_UL_SRS:
       NS_FATAL_ERROR ("cannot TX while RX: according to FDD channel access, the physical layer for transmission cannot be used for reception");
+      //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<<" StartTxDataFrame cannot TX while RX: according to FDD channel access, the physical layer for transmission cannot be used for reception"<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
       break;
 
     case TX_DATA:
     case TX_DL_CTRL:      
     case TX_UL_SRS:
       NS_FATAL_ERROR ("cannot TX while already TX: the MAC should avoid this");
+      //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<<" StartTxDataFrame cannot TX while already TX: the MAC should avoid this"<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
       break;
       
     case IDLE:
@@ -680,12 +696,14 @@ LteSpectrumPhy::StartTxSlDataFrame (Ptr<PacketBurst> pb, std::list<Ptr<LteContro
     case RX_DL_CTRL:
     case RX_UL_SRS:
       NS_FATAL_ERROR ("cannot TX while RX: according to FDD channel acces, the physical layer for transmission cannot be used for reception");
+      //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<<" StartTxSlDataFrame cannot TX while RX: according to FDD channel access, the physical layer for transmission cannot be used for reception"<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
       break;
 
     case TX_DATA:
     case TX_DL_CTRL:      
     case TX_UL_SRS:
       NS_FATAL_ERROR ("cannot TX while already TX: the MAC should avoid this");
+      //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<<" StartTxSlDataFrame cannot TX while already TX: the MAC should avoid this"<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
       break;
 
     case TX_UL_V2X_SCI:
@@ -886,6 +904,8 @@ LteSpectrumPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
 {
   NS_LOG_FUNCTION (this << spectrumRxParams);
   NS_LOG_LOGIC (this << " state: " << m_state);
+  if(m_disabled)
+	  return;
   
   Ptr <const SpectrumValue> rxPsd = spectrumRxParams->psd;
   Time duration = spectrumRxParams->duration;
@@ -945,9 +965,11 @@ LteSpectrumPhy::StartRxData (Ptr<LteSpectrumSignalParametersDataFrame> params)
       case TX_DL_CTRL:
       case TX_UL_SRS:
         NS_FATAL_ERROR ("cannot RX while TX: according to FDD channel access, the physical layer for transmission cannot be used for reception");
+        //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<<" StartRxDatacannot RX while TX: according to FDD channel access, the physical layer for transmission cannot be used for reception"<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
         break;
       case RX_DL_CTRL:
         NS_FATAL_ERROR ("cannot RX Data while receiving control");
+        //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<<" StartRxData cannot RX Data while receiving control: the MAC should avoid this"<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
         break;
       case IDLE:
       case RX_DATA:
@@ -1023,9 +1045,11 @@ LteSpectrumPhy::StartRxSlData (Ptr<LteSpectrumSignalParametersSlFrame> params)
       case TX_DL_CTRL:
       case TX_UL_SRS:
         NS_FATAL_ERROR ("cannot RX while TX: according to FDD channel access, the physical layer for transmission cannot be used for reception");
+        //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<<" StartRxSlData cannot RX while TX: according to FDD channel access, the physical layer for transmission cannot be used for reception"<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
         break;
       case RX_DL_CTRL:
         NS_FATAL_ERROR ("cannot RX Data while receiving control");
+        //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<<"cannot RX Data while receiving control"<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
         break;
       case IDLE:
     case RX_DATA:
@@ -1038,7 +1062,7 @@ LteSpectrumPhy::StartRxSlData (Ptr<LteSpectrumSignalParametersSlFrame> params)
         if (m_cellId == 0 && params->nodeId != GetDevice()->GetNode()->GetId())
           {
             NS_LOG_LOGIC (this << " the signal is neither from eNodeB nor from this UE ");
-
+            //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<<" the signal is neither from eNodeB nor from this UE "<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
             //SLSSs (PSBCH) should be received by all UEs
             //Checking if it is a SLSS, and if it is: measure S-RSRP and receive MIB-SL
             if (params->ctrlMsgList.size () >0)
@@ -1164,11 +1188,13 @@ LteSpectrumPhy::StartRxSlData (Ptr<LteSpectrumSignalParametersSlFrame> params)
             else
               {
                 NS_LOG_LOGIC (this << " not in sync with this sidelink signal... Ignoring ");
+                //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<< " not in sync with this sidelink signal... Ignoring "<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
               }
           }
         else
         {
         	NS_LOG_LOGIC (this << " the signal is from eNodeB or from this UE... Ignoring");
+        	//*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<< " the signal is from eNodeB or from this UE... Ignoring"<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
         }
       }
       break;
@@ -1782,6 +1808,7 @@ LteSpectrumPhy::EndRxSlData ()
   if (m_dropRbOnCollisionEnabled)
     {
       NS_LOG_DEBUG (this << " PSSCH DropOnCollisionEnabled: Identifying RB Collisions");
+      //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<< " PSSCH DropOnCollisionEnabled: Identifying RB Collisions"<<" ID:" << GetDevice()->GetNode()->GetId() << " state: " << m_state<<std::endl;
       //Add new loop to make one pass and identify which RB have collisions
       
       std::set<int> rbDecodedBitmapTemp;
@@ -1849,6 +1876,7 @@ LteSpectrumPhy::EndRxSlData ()
                    if (rbDecodedBitmap.find (*rbIt) != rbDecodedBitmap.end ())
                      {
                         NS_LOG_DEBUG( this << "\t" << *rbIt << " decoded, labeled as corrupted!");
+                        //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<< "\t" << *rbIt << " decoded, labeled as corrupted!"<<std::endl;
                         rbDecoded = true;
                         (*itTb).second.corrupt = true;
                         break;
@@ -1868,7 +1896,8 @@ LteSpectrumPhy::EndRxSlData ()
                       }
                   }
               NS_LOG_DEBUG (this << " from RNTI " << (*itTb).first.m_rnti << " size " << (*itTb).second.size << " mcs " << (uint32_t)(*itTb).second.mcs << " bitmap " << (*itTb).second.rbBitmap.size () << " TBLER " << tbStats.tbler << " corrupted " << (*itTb).second.corrupt);
-              //std::cout << this << " from RNTI " << (*itTb).first.m_rnti << " size " << (*itTb).second.size << " mcs " << (uint32_t)(*itTb).second.mcs << " bitmap " << (*itTb).second.rbBitmap.size () << " TBLER " << tbStats.tbler << " corrupted " << (*itTb).second.corrupt << " mean SINR " << GetMeanSinr (m_slSinrPerceived[(*itSinr).second]*4, (*itTb).second.rbBitmap) << std::endl;
+              *log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<< " from RNTI " << (*itTb).first.m_rnti << " size " << (*itTb).second.size << " mcs " << (uint32_t)(*itTb).second.mcs << " bitmap " << (*itTb).second.rbBitmap.size () << " TBLER " << tbStats.tbler << " corrupted " << (*itTb).second.corrupt<<std::endl;
+              std::cout << this << " from RNTI " << (*itTb).first.m_rnti << " size " << (*itTb).second.size << " mcs " << (uint32_t)(*itTb).second.mcs << " bitmap " << (*itTb).second.rbBitmap.size () << " TBLER " << tbStats.tbler << " corrupted " << (*itTb).second.corrupt << " mean SINR " << GetMeanSinr (m_slSinrPerceived[(*itSinr).second]*4, (*itTb).second.rbBitmap) << std::endl;
             } 
           else 
             {
@@ -1882,6 +1911,7 @@ LteSpectrumPhy::EndRxSlData ()
                     }
                 }
               NS_LOG_DEBUG (this << " from RNTI " << (*itTb).first.m_rnti << " size " << (*itTb).second.size << " mcs " << (uint32_t)(*itTb).second.mcs << " bitmap " << (*itTb).second.rbBitmap.size () << " TBLER " << tbStats.tbler << " corrupted " << (*itTb).second.corrupt);
+              *log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<< "NIST errorModel enabled from RNTI " << (*itTb).first.m_rnti << " size " << (*itTb).second.size << " mcs " << (uint32_t)(*itTb).second.mcs << " bitmap " << (*itTb).second.rbBitmap.size () << " TBLER " << tbStats.tbler << " corrupted " << (*itTb).second.corrupt<<std::endl;
               //std::cout << this << " from RNTI " << (*itTb).first.m_rnti << " size " << (*itTb).second.size << " mcs " << (uint32_t)(*itTb).second.mcs << " bitmap " << (*itTb).second.rbBitmap.size () << " TBLER " << tbStats.tbler << " corrupted " << (*itTb).second.corrupt << " mean SINR " << GetMeanSinr (m_slSinrPerceived[(*itSinr).second]*4, (*itTb).second.rbBitmap) << std::endl;
 
             }
@@ -1927,7 +1957,7 @@ LteSpectrumPhy::EndRxSlData ()
           HarqProcessInfoList_t harqInfoList;
 
           NS_LOG_DEBUG(this << "\t" << Simulator::Now ().GetMilliSeconds () << "\tFrom: " << (*itTbV2x).first.m_rnti << "\tCorrupt: " << (*itTbV2x).second.corrupt);
-
+          //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds ()<< "\tFrom: " << (*itTbV2x).first.m_rnti << "\tCorrupt: " << (*itTbV2x).second.corrupt<<std::endl;
           bool rbDecoded = false;
           if (m_dropRbOnCollisionEnabled)
           {
@@ -1938,6 +1968,7 @@ LteSpectrumPhy::EndRxSlData ()
                   if (rbDecodedBitmap.find (*rbIt) != rbDecodedBitmap.end ())
                     {
                       NS_LOG_DEBUG( this << "\t" << *rbIt << " decoded, labeled as corrupted!");
+                      //*log_uespecphy->GetStream() << Simulator::Now ().GetSeconds () << "\t" << *rbIt << " decoded, labeled as corrupted!"<<std::endl;
                       rbDecoded = true;
                       (*itTbV2x).second.corrupt = true;
                       break;
@@ -1958,6 +1989,7 @@ LteSpectrumPhy::EndRxSlData ()
                     }
                 }
             NS_LOG_DEBUG (this << " from RNTI " << (*itTbV2x).first.m_rnti << " size " << (*itTbV2x).second.size << " mcs " << (uint32_t)(*itTbV2x).second.mcs << " bitmap " << (*itTbV2x).second.rbBitmap.size () << " TBLER " << tbStats.tbler << " corrupted " << (*itTbV2x).second.corrupt);
+            *log_uespecphy->GetStream() << Simulator::Now ().GetSeconds () <<  " from RNTI " << (*itTbV2x).first.m_rnti << " size " << (*itTbV2x).second.size << " mcs " << (uint32_t)(*itTbV2x).second.mcs << " bitmap " << (*itTbV2x).second.rbBitmap.size () << " TBLER " << tbStats.tbler << " corrupted " << (*itTbV2x).second.corrupt<<std::endl;
           } 
           else 
           {
@@ -1984,6 +2016,12 @@ LteSpectrumPhy::EndRxSlData ()
                                 << " bitmap " << (*itTbV2x).second.rbBitmap.size () 
                                 << " TBLER " << tbStats.tbler 
                                 << " corrupted " << (*itTbV2x).second.corrupt);
+            *log_uespecphy->GetStream()<< Simulator::Now ().GetSeconds () << " from RNTI " << (*itTbV2x).first.m_rnti
+                    << " size " << (*itTbV2x).second.size
+                    << " mcs " << (uint32_t)(*itTbV2x).second.mcs
+                   << " bitmap " << (*itTbV2x).second.rbBitmap.size ()
+                    << " TBLER " << tbStats.tbler
+                    << " corrupted " << (*itTbV2x).second.corrupt<<std::endl;
           }
 
         // fire traces on SL reception PHY stats
@@ -2223,6 +2261,7 @@ LteSpectrumPhy::EndRxSlData ()
                       errorRate = LtePhyErrorModel::GetPscchBler (m_fadingModel,LtePhyErrorModel::SISO, GetMeanSinr (m_slSinrPerceived[i]*4 /* Average gain for SIMO based on [CatreuxMIMO] */, pscchBitmap)).tbler;
                       ctrlError = m_random->GetValue () > errorRate ? false : true;
                       NS_LOG_DEBUG (this << " PSCCH Decoding, errorRate " << errorRate << " error " << ctrlError);
+                      //*log_uespecphy->GetStream()<< Simulator::Now ().GetSeconds () << " PSCCH Decoding, errorRate " << errorRate << " error " << ctrlError << std::endl;
                     }
                   else if (m_rxPacketInfo[i].m_rxControlMessage->GetMessageType() == LteControlMessage::MIB_SL)
                     {

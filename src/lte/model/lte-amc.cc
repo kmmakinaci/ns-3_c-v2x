@@ -31,7 +31,7 @@
 #include <ns3/double.h>
 #include "ns3/enum.h"
 #include <ns3/lte-mi-error-model.h>
-
+#include "ns3/network-module.h"
 
 namespace ns3 {
 
@@ -230,9 +230,17 @@ static const int TransportBlockSizeTable [110][27] = {
 
 };
 
+std::string bler_log = "log_bler_v2x.csv";
+Ptr<OutputStreamWrapper> bler_logs;
+
+std::string mcsbler_log = "log_mcsbler_v2x.csv";
+Ptr<OutputStreamWrapper> mcsbler_logs;
 
 LteAmc::LteAmc ()
 {
+    AsciiTraceHelper ascii;
+    bler_logs = ascii.CreateFileStream(bler_log);
+    mcsbler_logs = ascii.CreateFileStream(mcsbler_log);
 }
 
 
@@ -365,7 +373,11 @@ LteAmc::CreateCqiFeedbacks (const SpectrumValue& sinr, uint8_t rbgSize)
                                     << " (=" << 10 * std::log10 (sinr_) << " dB)"
                                     << ", spectral efficiency =" << s
                                     << ", CQI = " << cqi_ << ", BER = " << m_ber);
-
+              *bler_logs->GetStream() << Simulator::Now ().GetSeconds () << ";" << "PRB =" << ";"<< cqi.size ()
+		<< ";" << ", sinr = " << ";"<< sinr_
+		<< ";"<< " (=" << ";"<< 10 * std::log10 (sinr_) << ";"<< " dB)"
+		<< ";"<< ", spectral efficiency =" << ";"<< s
+		<< ";"<< ", CQI = " << ";"<< cqi_ << ", BER = " << ";"<< m_ber<< std::endl;
               cqi.push_back (cqi_);
             }
         }
@@ -399,6 +411,7 @@ LteAmc::CreateCqiFeedbacks (const SpectrumValue& sinr, uint8_t rbgSize)
                 mcs--;
               }
             NS_LOG_DEBUG (this << "\t RBG " << rbId << " MCS " << (uint16_t)mcs << " TBLER " << tbStats.tbler);
+            *mcsbler_logs->GetStream() << Simulator::Now ().GetSeconds () << ";" << "\t RBG " << ";"<< rbId << ";"<< " MCS " << ";"<< (uint16_t)mcs << ";"<< " TBLER " << ";"<< tbStats.tbler<< std::endl;
             int rbgCqi = 0;
             if ((tbStats.tbler > 0.1)&&(mcs==0))
               {
@@ -418,6 +431,7 @@ LteAmc::CreateCqiFeedbacks (const SpectrumValue& sinr, uint8_t rbgSize)
                 }
               }
             NS_LOG_DEBUG (this << "\t MCS " << (uint16_t)mcs << "-> CQI " << rbgCqi);
+            *mcsbler_logs->GetStream() << Simulator::Now ().GetSeconds () << ";" << "\t MCS " << ";"<< (uint16_t)mcs << ";"<< "-> CQI " << ";"<< rbgCqi << std::endl;
             // fill the cqi vector (per RB basis)
             for (uint8_t j = 0; j < rbgSize; j++)
               {

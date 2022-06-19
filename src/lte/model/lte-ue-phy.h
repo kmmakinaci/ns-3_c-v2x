@@ -124,6 +124,9 @@ public:
    */
   void SetTxPower (double pow);
 
+  void SetDisabled(bool disabled);
+
+  bool GetDisabled();
   /**
    * \return the transmission power in dBm
    */
@@ -673,6 +676,9 @@ private:
   bool m_v2xEnabled; 
 
   bool m_pssReceived; ///< PSS received?
+
+
+  bool m_disabled;
   /// PssElement structure
   struct PssElement 
   {

@@ -47,12 +47,20 @@
 #include <ns3/node.h>
 #include <fstream>
 
+#include "ns3/network-module.h"
+
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("LteUePhy");
 
+std::string sim_uephy = "log_uephy_v2x.csv";
+Ptr<OutputStreamWrapper> log_uephy;
 
+std::string sim_uephy_cont = "log_uephyCont_v2x.csv";
+Ptr<OutputStreamWrapper> log_uephy_cont;
 
+std::string sim_uephy_subframeInd = "log_uephy_subframeInd_v2x.csv";
+Ptr<OutputStreamWrapper> log_uephy_subframeInd;
 /**
  * Duration of the data portion of a UL subframe.
  * Equals to "TTI length - 1 symbol length for SRS - margin".
@@ -184,6 +192,13 @@ LteUePhy::LteUePhy (Ptr<LteSpectrumPhy> dlPhy, Ptr<LteSpectrumPhy> ulPhy)
   NS_ASSERT_MSG (Simulator::Now ().GetNanoSeconds () == 0,
                  "Cannot create UE devices after simulation started");
 
+  AsciiTraceHelper ascii;
+  log_uephy = ascii.CreateFileStream(sim_uephy);
+  log_uephy_cont = ascii.CreateFileStream(sim_uephy_cont);
+  log_uephy_subframeInd = ascii.CreateFileStream(sim_uephy_subframeInd);
+
+  *log_uephy->GetStream() << Simulator::Now ().GetSeconds ()<<";"<< " rnti " << ";"<< "FrameNo: "<< ";" << "SubFrameNo: " << ";" << " rb start " << ";" << "rbLen " << ";" << "slRsrp dBm "<< ";" << "slRssi " << ";" << "m_grant.m_prio" << ";" << "m_grant.m_pRsvp<" << std::endl;
+
   //Simulator::ScheduleNow (&LteUePhy::SubframeIndication, this, 1, 1); //Now it is done in the function SetInitialSubFrameIndication
 
   Simulator::Schedule (m_ueMeasurementsFilterPeriod, &LteUePhy::ReportUeMeasurements, this);
@@ -206,7 +221,7 @@ LteUePhy::LteUePhy (Ptr<LteSpectrumPhy> dlPhy, Ptr<LteSpectrumPhy> ulPhy)
 
   m_discRxApps.clear (); 
   m_discTxApps.clear ();
-
+  m_disabled=false;
   DoReset ();
 }
 
@@ -438,6 +453,17 @@ LteUePhy::DoInitialize ()
 }
 
 void
+LteUePhy::SetDisabled(bool disabled){
+	m_disabled = disabled;
+	m_sidelinkSpectrumPhy->SetDisabled(disabled);
+}
+
+bool
+LteUePhy::GetDisabled(){
+	return m_disabled;
+}
+
+void
 LteUePhy::SetLteUePhySapUser (LteUePhySapUser* s)
 {
   NS_LOG_FUNCTION (this);
@@ -660,7 +686,7 @@ LteUePhy::GenerateCqiRsrpRsrq (const SpectrumValue& sinr)
         }
       double avSinr = (rbNum > 0) ? (sum / rbNum) : DBL_MAX;
       NS_LOG_INFO (this << " cellId " << m_cellId << " rnti " << m_rnti << " RSRP " << rsrp << " SINR " << avSinr << " ComponentCarrierId " << (uint16_t) m_componentCarrierId);
-
+      *log_uephy->GetStream() << Simulator::Now ().GetSeconds () <<" cellId " << m_cellId << " rnti " << m_rnti << " RSRP " << rsrp << " SINR " << avSinr << " ComponentCarrierId " << (uint16_t) m_componentCarrierId << std::endl;
       m_reportCurrentCellRsrpSinrTrace (m_cellId, m_rnti, rsrp, avSinr, (uint16_t) m_componentCarrierId);
       m_rsrpSinrSampleCounter = 0;
     }
@@ -696,6 +722,8 @@ LteUePhy::GenerateCqiRsrpRsrq (const SpectrumValue& sinr)
             {
               NS_LOG_INFO (this << " PSS RNTI " << m_rnti << " cellId " << m_cellId
                                 << " has RSRQ " << rsrq_dB << " and RBnum " << rbNum);
+              *log_uephy->GetStream() << Simulator::Now ().GetSeconds () << " PSS RNTI " << m_rnti << " cellId " << m_cellId
+                      << " has RSRQ " << rsrq_dB << " and RBnum " << rbNum << std::endl;
               // store measurements
               std::map <uint16_t, UeMeasurementsElement>::iterator itMeasMap;
               itMeasMap = m_ueMeasurementsMap.find ((*itPss).cellId);
@@ -940,6 +968,12 @@ LteUePhy::ReportUeMeasurements ()
                          << " RSRQ " << avg_rsrq
                          << " (nSamples " << (uint16_t)(*it).second.rsrqNum << ")"
                          << " ComponentCarrierID " << (uint16_t)m_componentCarrierId);
+      *log_uephy->GetStream() << Simulator::Now ().GetSeconds () << " CellId " << (*it).first
+              << " RSRP " << avg_rsrp
+              << " (nSamples " << (uint16_t)(*it).second.rsrpNum << ")"
+              << " RSRQ " << avg_rsrq
+              << " (nSamples " << (uint16_t)(*it).second.rsrqNum << ")"
+              << " ComponentCarrierID " << (uint16_t)m_componentCarrierId << std::endl;
       if (avg_rsrp >= m_rsrpReceptionThreshold)
       {
         LteUeCphySapUser::UeMeasurementsElement newEl;
@@ -990,6 +1024,8 @@ LteUePhy::ReceiveLteControlMessageList (std::list<Ptr<LteControlMessage> > msgLi
 
   std::list<Ptr<LteControlMessage> >::iterator it;
   NS_LOG_DEBUG (this << " I am rnti = " << m_rnti << " and I received msgs " << (uint16_t) msgList.size ());
+  *log_uephy_cont->GetStream() << Simulator::Now ().GetSeconds () <<" I am rnti = " << m_rnti << " and I received msgs " << (uint16_t) msgList.size ()<< std::endl;
+
   for (it = msgList.begin (); it != msgList.end (); it++)
     {
       Ptr<LteControlMessage> msg = (*it);
@@ -1149,13 +1185,14 @@ LteUePhy::ReceiveLteControlMessageList (std::list<Ptr<LteControlMessage> > msgLi
               if (sci.m_groupDstId == ((*it) & 0xFF))
                 {
                   NS_LOG_INFO ("received SCI for group " << (uint32_t)((*it) & 0xFF) << " from rnti " << sci.m_rnti);
-
+                  *log_uephy_cont->GetStream() << Simulator::Now ().GetSeconds () << "received SCI for group " << (uint32_t)((*it) & 0xFF) << " from rnti " << sci.m_rnti << std::endl;
                   //todo, how to find the pool among the available ones?
                   //right now just use the first one
                   std::list <PoolInfo>::iterator poolIt = m_sidelinkRxPools.begin();
                   if (poolIt == m_sidelinkRxPools.end())
                     {
                       NS_LOG_INFO (this << " No Rx pool configured");
+                      *log_uephy_cont->GetStream() << Simulator::Now ().GetSeconds () << " No Rx pool configured"<< std::endl;
                     }
                   else
                     {
@@ -1240,6 +1277,7 @@ LteUePhy::ReceiveLteControlMessageList (std::list<Ptr<LteControlMessage> > msgLi
           SlDiscMsg disc = msg2->GetSlDiscMessage ();
 
           NS_LOG_INFO ("received discovery from rnti " << disc.m_rnti << " with resPsdch: " << disc.m_resPsdch);
+          *log_uephy_cont->GetStream() << Simulator::Now ().GetSeconds () << "received discovery from rnti " << disc.m_rnti << " with resPsdch: " << disc.m_resPsdch << std::endl;
           m_uePhySapUser->ReceiveLteControlMessage (msg);
         }
       else
@@ -1271,6 +1309,8 @@ LteUePhy::ReceivePss (uint16_t cellId, Ptr<SpectrumValue> p)
   double rsrp_dBm = 10 * log10 (1000 * (sum / (double)nRB));
   NS_LOG_INFO (this << " PSS RNTI " << m_rnti << " cellId " << m_cellId
                     << " has RSRP " << rsrp_dBm << " and RBnum " << nRB);
+  *log_uephy->GetStream() << Simulator::Now ().GetSeconds () << " PSS RNTI " << m_rnti << " cellId " << m_cellId
+          << " has RSRP " << rsrp_dBm << " and RBnum " << nRB << std::endl;
   // note that m_pssReceptionThreshold does not apply here
 
   // store measurements
@@ -1315,6 +1355,7 @@ void
 LteUePhy::SubframeIndication (uint32_t frameNo, uint32_t subframeNo)
 {
   NS_LOG_FUNCTION (this << " frame " << frameNo << " subframe " << subframeNo << " rnti " << m_rnti);
+  //*log_uephy->GetStream() << Simulator::Now ().GetSeconds () <<  " frame " << frameNo << " subframe " << subframeNo << " rnti " << m_rnti << std::endl;
 
   NS_ASSERT_MSG (frameNo > 0, "the SRS index check code assumes that frameNo starts at 1");
 
@@ -1444,6 +1485,7 @@ LteUePhy::SubframeIndication (uint32_t frameNo, uint32_t subframeNo)
                       rxIt->subframe.frameNo++;
                       rxIt->subframe.subframeNo++;
                       NS_LOG_INFO (this << " Subframe Rx" << rxIt->subframe.frameNo << "/" << rxIt->subframe.subframeNo << ": rbStart=" << (uint32_t) rxIt->rbStart << ", rbLen=" << (uint32_t) rxIt->nbRb);
+                      *log_uephy_subframeInd->GetStream() << Simulator::Now ().GetSeconds ()<< ";" <<" Subframe Rx " << ";" << rxIt->subframe.frameNo << "/"<< rxIt->subframe.subframeNo << ";" <<": rbStart=" << ";" <<(uint32_t) rxIt->rbStart << ";" <<", rbLen=" << ";" <<(uint32_t) rxIt->nbRb <<std::endl;
                     }
 
                   grantIt->second.m_grant_received = false;
@@ -1505,17 +1547,21 @@ LteUePhy::SubframeIndication (uint32_t frameNo, uint32_t subframeNo)
                     {
                       //std::cout << "Rnti="<< m_rnti << "\t PHY PSCCH RX at " << rxIt->subframe.frameNo << "/" << rxIt->subframe.subframeNo << "\t rbStart=" << (uint32_t) rxIt->rbStart << "\t rbLen=" << (uint32_t) rxIt->rbLen << << "\t from rnti=" << grantIt->first << std::endl;
                       NS_LOG_INFO (this << " PSCCH Rx " << rxIt->subframe.frameNo << "/"<< rxIt->subframe.subframeNo << ": rbStart=" << (uint32_t) rxIt->rbStart << ", rbLen=" << (uint32_t) rxIt->rbLen);
+                      *log_uephy_subframeInd->GetStream() << Simulator::Now ().GetSeconds ()<< ";" <<" PSCCH Rx " << ";" <<rxIt->subframe.frameNo << "/"<< rxIt->subframe.subframeNo << ";" <<": rbStart=" << ";" <<(uint32_t) rxIt->rbStart <<";" << ", rbLen=" << ";" <<(uint32_t) rxIt->rbLen << std::endl;
                     }
                   for(rxIt = grantIt->second.m_psschTx.begin(); rxIt != grantIt->second.m_psschTx.end(); rxIt++)
                     {
                       //std::cout << "Rnti=" << m_rnti << "\t PHY PSSCH RX at " << rxIt->subframe.frameNo << "/"<< rxIt->subframe.subframeNo << "\t rbStart=" << (uint32_t) rxIt->rbStart << "\t rbLen=" << (uint32_t) rxIt->rbLen << "\t from rnti=" << grantIt->first <<std::endl;
                       NS_LOG_INFO (this << " PSSCH Rx " << rxIt->subframe.frameNo << "/"<< rxIt->subframe.subframeNo << ": rbStart=" << (uint32_t) rxIt->rbStart << ", rbLen=" << (uint32_t) rxIt->rbLen);
+                      *log_uephy_subframeInd->GetStream() << Simulator::Now ().GetSeconds ()<< ";" <<" PSSCH Rx " << ";" <<rxIt->subframe.frameNo << "/"<< rxIt->subframe.subframeNo << ";" <<": rbStart=" << ";" <<(uint32_t) rxIt->rbStart << ";" <<", rbLen=" << ";" <<(uint32_t) rxIt->rbLen<<std::endl;
                     }
 
                   double slRsrp_dBm = GetSidelinkRsrp(m_sidelinkSpectrumPhy->GetSlSignalPerceived()); 
                   double slRssi_dBm = GetSidelinkRssi(m_sidelinkSpectrumPhy->GetSlSignalPerceived(), m_sidelinkSpectrumPhy->GetSlInterferencePerceived());
                   m_uePhySapUser->PassSensingData(frameNo, subframeNo, grantIt->second.m_grant.m_pRsvp, grantIt->second.m_psschTx.begin()->rbStart, grantIt->second.m_psschTx.begin()->rbLen, grantIt->second.m_grant.m_prio, slRsrp_dBm, slRssi_dBm); 
+                  //*log_uephy->GetStream() << Simulator::Now ().GetSeconds ()<< " rnti " << m_rnti<< "FrameNo: "<< frameNo << "SubFrameNo: " << subframeNo << " rb start " << grantIt->second.m_psschTx.begin()->rbStart << "rbLen " << grantIt->second.m_psschTx.begin()->rbLen << "slRsrp dBm "<< slRsrp_dBm << "slRssi " << slRssi_dBm << ";" << grantIt->second.m_grant.m_prio << grantIt->second.m_grant.m_pRsvp <<std::endl;
 
+                  *log_uephy->GetStream() << Simulator::Now ().GetSeconds ()<< ";" << m_rnti<< ";"<< frameNo << ";" << subframeNo << ";" << grantIt->second.m_psschTx.begin()->rbStart << ";" << grantIt->second.m_psschTx.begin()->rbLen << ";"<< slRsrp_dBm << ";" << slRssi_dBm << ";" << grantIt->second.m_grant.m_prio << ";"<<grantIt->second.m_grant.m_pRsvp <<std::endl;
                   grantIt->second.m_grant_received = false;
                 }
               //now check if there is any grant for the current subframe and pass them to lower layer
@@ -1556,6 +1602,7 @@ LteUePhy::SubframeIndication (uint32_t frameNo, uint32_t subframeNo)
           if ((((frameNo-1)*10 + (subframeNo-1)) % m_srsPeriodicity) == m_srsSubframeOffset)
             {
               NS_LOG_INFO ("frame " << frameNo << " subframe " << subframeNo << " sending SRS (offset=" << m_srsSubframeOffset << ", period=" << m_srsPeriodicity << ")");
+              *log_uephy_subframeInd->GetStream() << Simulator::Now ().GetSeconds ()<<"frame " << frameNo << " subframe " << subframeNo << " sending SRS (offset=" << m_srsSubframeOffset << ", period=" << m_srsPeriodicity << ")"<<std::endl;
               m_sendSrsEvent = Simulator::Schedule (UL_SRS_DELAY_FROM_SUBFRAME_START, 
                                                     &LteUePhy::SendSrs,
                                                     this);
@@ -1925,7 +1972,7 @@ LteUePhy::SubframeIndication (uint32_t frameNo, uint32_t subframeNo)
                   }
                 }     
             }//end if !m_waitingNextScPeriod
-          else if(m_v2xEnabled)
+          else if(m_v2xEnabled && !m_disabled)
             {
               NS_LOG_LOGIC (this << " V2X");
               // send packets in queue
@@ -2794,11 +2841,14 @@ void LteUePhy::ReceiveSlss(uint16_t slssid, Ptr<SpectrumValue> p)
 
       NS_LOG_INFO(this << " UE RNTI " << m_rnti << " received SLSS from SyncRef with SLSSID " << slssid
                   << " offset "<< offset << " with S-RSRP " << s_rsrp_dBm << " dBm" );
+      *log_uephy->GetStream() << Simulator::Now ().GetSeconds () <<" UE RNTI " << m_rnti << " received SLSS from SyncRef with SLSSID " << slssid
+              << " offset "<< offset << " with S-RSRP " << s_rsrp_dBm << " dBm"<<std::endl;
 
       //If it is not detectable, ignore
       if (s_rsrp_dBm < m_minSrsrp)
         {
           NS_LOG_LOGIC (this << " The S-RSRP is below the minimum required... Ignoring");
+          *log_uephy->GetStream() << Simulator::Now ().GetSeconds ()<< " The S-RSRP is below the minimum required... Ignoring"<<std::endl;
           return;
         }
 
@@ -2836,6 +2886,7 @@ void LteUePhy::ReceiveSlss(uint16_t slssid, Ptr<SpectrumValue> p)
               else
                 {
                   NS_LOG_LOGIC (this << " SyncRef was not detected during SyncRef search/scanning... Ignoring");
+                  *log_uephy->GetStream() << Simulator::Now ().GetSeconds ()<< " SyncRef was not detected during SyncRef search/scanning... Ignoring"<<std::endl;
                 }
             }
         }
@@ -2850,6 +2901,7 @@ void LteUePhy::ReceiveSlss(uint16_t slssid, Ptr<SpectrumValue> p)
   else
     {
       NS_LOG_LOGIC (this << " The UE is not currently performing SyncRef scanning or S-RSRP measurement... Ignoring");
+      *log_uephy->GetStream() << Simulator::Now ().GetSeconds ()<< " The UE is not currently performing SyncRef scanning or S-RSRP measurement... Ignoring"<<std::endl;
     }
 }
 
@@ -3268,7 +3320,10 @@ LteUePhy::ChangeOfTiming(uint32_t frameNo, uint32_t subframeNo)
                   << " changed the Subframe Indication from: "
                   << " frame "<<m_currFrameNo<< "subframe "<<m_currSubframeNo
                   << " to: frame "<< frameNo << " subframe " << subframeNo);
-
+      *log_uephy->GetStream() << Simulator::Now ().GetSeconds ()<< " UE RNTI " << m_rnti << "did not have a Tx pool and"
+              << " changed the Subframe Indication from: "
+              << " frame "<<m_currFrameNo<< "subframe "<<m_currSubframeNo
+              << " to: frame "<< frameNo << " subframe " << subframeNo<<std::endl;
       //Notify RRC about the successful change of SyncRef and timing
       m_ueCphySapUser->ReportChangeOfSyncRef(m_resyncParams.syncRefMib, frameNo, subframeNo);
 

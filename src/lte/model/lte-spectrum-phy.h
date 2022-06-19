@@ -485,6 +485,10 @@ public:
    */
   void SetComponentCarrierId (uint8_t componentCarrierId);
 
+
+  void SetDisabled(bool disabled);
+  bool GetDisabled();
+
   /** 
    * \brief Add a new L1 group for filtering
    * 
@@ -817,6 +821,8 @@ private:
   std::vector <double> m_txModeGain; ///< duplicate value of LteUePhy
 
   bool m_ulDataSlCheck;
+
+  bool m_disabled;
 
   Ptr<LteHarqPhy> m_harqPhyModule; ///< the HARQ phy module
   LtePhyDlHarqFeedbackCallback m_ltePhyDlHarqFeedbackCallback; ///< the LTE phy DL HARQ feedback callback

@@ -153,9 +153,24 @@ def build(bld):
         'model/nist-scm-urbanmacrocell-propagation-loss-model.cc',
         'model/nist-indoor-propagation-loss-model.cc',
         'model/nist-outdoor-propagation-loss-model.cc',
-        'model/nist-hybrid-propagation-loss-model.cc'
+        'model/nist-hybrid-propagation-loss-model.cc',
+        'model/beaconing-protocol.cc',
+        'model/beaconing-protocol-header.cc',
+        'model/location-table.cc',
+        'model/sumo-mobility-model.cc',
+        'sumo-connection/sumsocket.cpp',
+        'sumo-connection/storage.cpp',
+        'sumo-connection/sumo-connection.cpp',
+        'sumo-connection/TraCIAPI.cpp',
+        'gui/GuiManager.cpp',
+        'gui/Topology.cpp',
+        'gui/GuiObject.cpp',
+        'gui/GuiNode.cpp',
+        'gui/Camera.cpp'
         ]
-
+    module.cflags=['-fPIC']
+    module.cxxflags=['-fPIC']
+    module.lib=['GL','GLU','glut','shp','pthread','SDL']
     module_test = bld.create_ns3_module_test_library('lte')
     module_test.source = [
         'test/lte-test-downlink-sinr.cc',
@@ -369,7 +384,24 @@ def build(bld):
         'model/nist-scm-urbanmacrocell-propagation-loss-model.h',
         'model/nist-indoor-propagation-loss-model.h',
         'model/nist-outdoor-propagation-loss-model.h',
-        'model/nist-hybrid-propagation-loss-model.h'
+        'model/nist-hybrid-propagation-loss-model.h',
+        'model/beaconing-protocol.h',
+        'model/beaconing-protocol-header.h',
+        'model/location-table.h',
+        'model/sumo-mobility-model.h',
+        'sumo-connection/sumsocket.h',
+        'sumo-connection/storage.h',
+        'sumo-connection/sumo-connection.h',
+        'sumo-connection/traci_config.h',
+        'sumo-connection/TraCIAPI.h',
+        'sumo-connection/TraCIDefs.h',
+        'sumo-connection/TraCIConstants.h',
+        'gui/GuiManager.h',
+        'gui/Camera.h',
+        'gui/Topology.h',
+        'gui/GuiObject.h',
+        'gui/GuiNode.h',
+        'gui/Utils.h'
         ]
 
     if (bld.env['ENABLE_EMU']):

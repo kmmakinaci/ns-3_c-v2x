@@ -41,11 +41,13 @@
 #include <ns3/packet-burst.h>
 #include "ns3/traced-value.h"
 #include "ns3/trace-source-accessor.h"
+#include "ns3/location-table.h"
 
 
 namespace ns3 {
 
 class UniformRandomVariable;
+class LocationTable;
 
 class LteUeMac :   public Object
 {
@@ -154,6 +156,11 @@ public:
    */
   void SetSlUeSelResMapping (std::string mapping);
  
+
+
+  void SetLocationTable(Ptr<LocationTable> loc_table);
+
+  Ptr<LocationTable> GetLocationTable(void);
   /**
    * TracedCallback signature for transmission of discovery message.
    *
@@ -420,6 +427,11 @@ private:
   // V2x
   bool m_v2xHarqEnabled; ///< harq enabled?
   bool m_adjacency; ///< adjacent PSCCH+PSSCH scheme enabled
+  bool m_geoscheduling; // < Geo Scheduling R. Molina-Masegosa, M. Sepulcre and J. Gozalvez, "Geo-Based Scheduling for C-V2X Networks," in IEEE Transactions on Vehicular Technology, vol. 68, no. 9, pp. 8397-8407, Sept. 2019.
+  SidelinkCommResourcePoolV2x::SubframeInfo m_last_posind_update;
+  unsigned int m_pps;
+  uint16_t m_cur_posindex;
+  bool m_posindex_updated;
   bool m_partialSensing; ///< partial sensing enabled
   double m_probResourceKeep; ///< probability for selecting the previous resource again 
   uint8_t m_t1; ///< defining the size of the selection window
@@ -627,6 +639,12 @@ private:
    * Update the sensing window (1000 ms) 
    */
   void UpdateSensingWindow (SidelinkCommResourcePoolV2x::SubframeInfo subframe);
+
+  /**
+   * Update the Pos Index Value (On PPS (10 20 or 50))
+   */
+  void UpdatePosIndex (SidelinkCommResourcePoolV2x::SubframeInfo subframe);
+  Ptr<LocationTable> m_loc_table;
    /**
    * \brief See 36.213 section 14.1.1.7 V15.0.0
    */

@@ -430,6 +430,8 @@ namespace ns3 {
      * \return the candidate resources for SPS 
      */
     std::list<SidelinkTransmissionInfo> GetCandidateResources (SubframeInfo startSelectionWindow, uint16_t t1, uint16_t t2, uint16_t subchLen);
+    SidelinkTransmissionInfo GetNextPosIndex(uint16_t m_posindex,SubframeInfo subframe,uint16_t pps);
+    SidelinkTransmissionInfo Randomize(uint16_t m_posindex,SidelinkCommResourcePoolV2x::SubframeInfo subframe,uint16_t pps);
 
      /**
      * Returns the subframes and RBs associated with the transmission on PSSCH
